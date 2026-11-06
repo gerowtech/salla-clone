@@ -1,4 +1,4 @@
-# Salla
+# Salla Comprehensive E-Commerce Platform
 
 Salla is a web-based business management and SaaS workspace built as a single repository with a Next.js frontend and a NestJS API. The application brings ERP workflows, company and user management, subscription-related screens, and website administration pages into one workspace.
 
