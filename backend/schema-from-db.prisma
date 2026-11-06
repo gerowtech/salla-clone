@@ -1,0 +1,443 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AuditLog {
+  id        String   @id @db.Uuid
+  userId    String?  @db.Uuid
+  companyId String?  @db.Uuid
+  action    String
+  entity    String
+  entityId  String?
+  ipAddress String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  User      User?    @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
+}
+
+model Branch {
+  id        String      @id @db.Uuid
+  companyId String      @db.Uuid
+  name      String
+  code      String
+  address   String?
+  isDefault Boolean     @default(false)
+  isActive  Boolean     @default(true)
+  Company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Warehouse Warehouse[]
+
+  @@unique([companyId, code])
+}
+
+model Category {
+  id        String   @id @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  parentId  String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model Company {
+  id            String          @id @db.Uuid
+  name          String
+  legalName     String?
+  slug          String          @unique
+  taxNumber     String?
+  countryCode   String          @default("PK")
+  currencyCode  String          @default("PKR")
+  timezone      String          @default("Asia/Karachi")
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  Branch        Branch[]
+  CompanyUser   CompanyUser[]
+  Customer      Customer[]
+  Product       Product[]
+  Project       Project[]
+  Purchase      Purchase[]
+  Sale          Sale[]
+  StockMovement StockMovement[]
+  Subscription  Subscription[]
+  Supplier      Supplier[]
+  Warehouse     Warehouse[]
+
+  @@index([countryCode])
+}
+
+model CompanyUser {
+  id        String           @id @db.Uuid
+  companyId String           @db.Uuid
+  userId    String           @db.Uuid
+  roleId    String?          @db.Uuid
+  status    MembershipStatus @default(ACTIVE)
+  isDefault Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  Company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Role      Role?            @relation(fields: [roleId], references: [id])
+  User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId, status])
+}
+
+model Customer {
+  id          String   @id @db.Uuid
+  companyId   String   @db.Uuid
+  name        String
+  email       String?
+  phone       String?
+  taxNumber   String?
+  creditLimit Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt   DateTime @default(now())
+  Company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, name])
+}
+
+model Permission {
+  id             String           @id @db.Uuid
+  key            String           @unique
+  description    String?
+  RolePermission RolePermission[]
+}
+
+model Product {
+  id             String   @id @db.Uuid
+  companyId      String   @db.Uuid
+  categoryId     String?  @db.Uuid
+  sku            String
+  barcode        String?
+  name           String
+  description    String?
+  unit           String   @default("pcs")
+  costPrice      Decimal  @db.Decimal(18, 4)
+  salePrice      Decimal  @db.Decimal(18, 4)
+  taxRate        Decimal  @default(0) @db.Decimal(8, 4)
+  trackInventory Boolean  @default(true)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  Company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, barcode])
+  @@unique([companyId, sku])
+  @@index([companyId, name])
+}
+
+model Project {
+  id               String             @id @db.Uuid
+  companyId        String             @db.Uuid
+  ownerId          String?            @db.Uuid
+  name             String
+  code             String
+  description      String?
+  status           ProjectStatus      @default(PLANNING)
+  priority         ProjectPriority    @default(MEDIUM)
+  startDate        DateTime?
+  dueDate          DateTime?
+  budget           Decimal?           @db.Decimal(18, 2)
+  progress         Int                @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  Company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  User             User?              @relation(fields: [ownerId], references: [id])
+  ProjectActivity  ProjectActivity[]
+  ProjectMember    ProjectMember[]
+  ProjectMilestone ProjectMilestone[]
+  ProjectTask      ProjectTask[]
+
+  @@unique([companyId, code])
+  @@index([companyId, status, dueDate])
+}
+
+model ProjectActivity {
+  id        String   @id @db.Uuid
+  projectId String   @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+}
+
+model ProjectMember {
+  projectId   String   @db.Uuid
+  userId      String   @db.Uuid
+  projectRole String   @default("member")
+  addedAt     DateTime @default(now())
+  Project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model ProjectMilestone {
+  id          String    @id @db.Uuid
+  projectId   String    @db.Uuid
+  title       String
+  description String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  Project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProjectTask {
+  id          String          @id @db.Uuid
+  projectId   String          @db.Uuid
+  title       String
+  description String?
+  status      String          @default("todo")
+  priority    ProjectPriority @default(MEDIUM)
+  assigneeId  String?         @db.Uuid
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  Project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+}
+
+model Purchase {
+  id              String         @id @db.Uuid
+  companyId       String         @db.Uuid
+  supplierId      String?        @db.Uuid
+  referenceNumber String
+  status          DocumentStatus @default(DRAFT)
+  subtotal        Decimal        @db.Decimal(18, 2)
+  taxTotal        Decimal        @db.Decimal(18, 2)
+  grandTotal      Decimal        @db.Decimal(18, 2)
+  createdAt       DateTime       @default(now())
+  Company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  PurchaseItem    PurchaseItem[]
+
+  @@unique([companyId, referenceNumber])
+}
+
+model PurchaseItem {
+  id         String   @id @db.Uuid
+  purchaseId String   @db.Uuid
+  productId  String   @db.Uuid
+  quantity   Decimal  @db.Decimal(18, 4)
+  unitCost   Decimal  @db.Decimal(18, 4)
+  lineTotal  Decimal  @db.Decimal(18, 2)
+  Purchase   Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String    @id @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  User      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Role {
+  id             String           @id @db.Uuid
+  name           String
+  key            String           @unique
+  description    String?
+  CompanyUser    CompanyUser[]
+  RolePermission RolePermission[]
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  Permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  Role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Sale {
+  id            String         @id @db.Uuid
+  companyId     String         @db.Uuid
+  branchId      String?        @db.Uuid
+  customerId    String?        @db.Uuid
+  invoiceNumber String
+  status        DocumentStatus @default(DRAFT)
+  paymentStatus PaymentStatus  @default(PENDING)
+  subtotal      Decimal        @db.Decimal(18, 2)
+  taxTotal      Decimal        @db.Decimal(18, 2)
+  discountTotal Decimal        @default(0) @db.Decimal(18, 2)
+  grandTotal    Decimal        @db.Decimal(18, 2)
+  currencyCode  String
+  createdAt     DateTime       @default(now())
+  Company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  SaleItem      SaleItem[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId, createdAt])
+}
+
+model SaleItem {
+  id          String  @id @db.Uuid
+  saleId      String  @db.Uuid
+  productId   String  @db.Uuid
+  description String
+  quantity    Decimal @db.Decimal(18, 4)
+  unitPrice   Decimal @db.Decimal(18, 4)
+  taxRate     Decimal @db.Decimal(8, 4)
+  lineTotal   Decimal @db.Decimal(18, 2)
+  Sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+}
+
+model StockMovement {
+  id            String            @id @db.Uuid
+  companyId     String            @db.Uuid
+  productId     String            @db.Uuid
+  warehouseId   String            @db.Uuid
+  type          StockMovementType
+  quantity      Decimal           @db.Decimal(18, 4)
+  unitCost      Decimal           @db.Decimal(18, 4)
+  referenceType String?
+  referenceId   String?           @db.Uuid
+  createdAt     DateTime          @default(now())
+  Company       Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, productId, warehouseId, createdAt])
+}
+
+model Subscription {
+  id               String             @id @db.Uuid
+  companyId        String             @db.Uuid
+  planId           String             @db.Uuid
+  status           SubscriptionStatus @default(TRIALING)
+  startsAt         DateTime           @default(now())
+  endsAt           DateTime?
+  Company          Company            @relation(fields: [companyId], references: [id])
+  SubscriptionPlan SubscriptionPlan   @relation(fields: [planId], references: [id])
+
+  @@index([companyId, status])
+}
+
+model SubscriptionPlan {
+  id           String         @id @db.Uuid
+  name         String
+  code         String         @unique
+  price        Decimal        @db.Decimal(18, 2)
+  interval     String         @default("month")
+  limits       Json
+  isActive     Boolean        @default(true)
+  Subscription Subscription[]
+}
+
+model Supplier {
+  id        String   @id @db.Uuid
+  companyId String   @db.Uuid
+  name      String
+  email     String?
+  phone     String?
+  taxNumber String?
+  createdAt DateTime @default(now())
+  Company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, name])
+}
+
+model User {
+  id            String          @id @db.Uuid
+  email         String          @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  phone         String?
+  status        UserStatus      @default(ACTIVE)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  AuditLog      AuditLog[]
+  CompanyUser   CompanyUser[]
+  Project       Project[]
+  ProjectMember ProjectMember[]
+  RefreshToken  RefreshToken[]
+}
+
+model Warehouse {
+  id        String  @id @db.Uuid
+  companyId String  @db.Uuid
+  branchId  String? @db.Uuid
+  name      String
+  code      String
+  Branch    Branch? @relation(fields: [branchId], references: [id])
+  Company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+}
+
+enum DocumentStatus {
+  DRAFT
+  POSTED
+  VOID
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  REFUNDED
+  FAILED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE
+  SALE
+  SALE_RETURN
+  PURCHASE_RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+

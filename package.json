@@ -1,0 +1,26 @@
+{
+  "name": "salla-all-in-one-pos-inventory-erp-ecommerce",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && node scripts/setup.mjs",
+    "dev": "concurrently -n API,WEB -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run start:dev --workspace backend",
+    "dev:web": "npm run dev --workspace frontend",
+    "db:setup": "node scripts/setup.mjs",
+    "db:generate": "npm run prisma:generate --workspace backend",
+    "db:push": "npm run prisma:push --workspace backend",
+    "db:seed": "npm run prisma:seed --workspace backend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

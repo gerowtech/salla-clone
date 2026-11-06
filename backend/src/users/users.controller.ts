@@ -1,0 +1,5 @@
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, UnauthorizedException } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { UsersService } from './users.service';
+@ApiTags('Users') @ApiBearerAuth() @Controller('users')
+export class UsersController { constructor(private users:UsersService){} private token(a?:string){if(!a?.startsWith('Bearer '))throw new UnauthorizedException('Bearer token required');return a.slice(7)} @Get() list(@Headers('authorization')a:string,@Headers('x-company-id')c:string){return this.users.list(this.token(a),c)} @Post() create(@Headers('authorization')a:string,@Headers('x-company-id')c:string,@Body()b:any){return this.users.create(this.token(a),c,b)} @Patch(':id') update(@Headers('authorization')a:string,@Headers('x-company-id')c:string,@Param('id')id:string,@Body()b:any){return this.users.update(this.token(a),c,id,b)} @Delete(':id') remove(@Headers('authorization')a:string,@Headers('x-company-id')c:string,@Param('id')id:string){return this.users.remove(this.token(a),c,id)} }

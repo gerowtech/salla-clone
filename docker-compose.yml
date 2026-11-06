@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: salepro-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: salepro
+    ports:
+      - "5432:5432"
+    volumes:
+      - salepro_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d salepro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    container_name: salepro-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - salepro_redis:/data
+volumes:
+  salepro_pgdata:
+  salepro_redis:

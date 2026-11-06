@@ -1,0 +1,4 @@
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service';
+@Injectable()
+export class CompaniesService { constructor(private db:PrismaService){} async list(userId:string){return this.db.company.findMany({where:{isActive:true,memberships:{some:{userId,status:'ACTIVE'}}},select:{id:true,name:true,slug:true,countryCode:true,currencyCode:true,memberships:{where:{userId},select:{isDefault:true,role:{select:{key:true}}}}}})} async select(userId:string,companyId:string){const m=await this.db.companyUser.findUnique({where:{companyId_userId:{companyId,userId}}}); if(!m||m.status!=='ACTIVE')throw new ForbiddenException('Company access denied'); const c=await this.db.company.findUnique({where:{id:companyId},select:{id:true,name:true,currencyCode:true,countryCode:true}}); if(!c)throw new NotFoundException(); return c;} }

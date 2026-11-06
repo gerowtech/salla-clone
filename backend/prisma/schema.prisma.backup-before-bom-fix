@@ -1,0 +1,392 @@
+﻿generator client {
+ provider = "prisma-client-js"
+}
+datasource db {
+ provider = "postgresql"
+ url = env("DATABASE_URL")
+}
+
+enum UserStatus {
+ ACTIVE
+ INVITED
+ SUSPENDED
+}
+enum MembershipStatus {
+ ACTIVE
+ INVITED
+ SUSPENDED
+}
+enum DocumentStatus {
+ DRAFT
+ POSTED
+ VOID
+}
+enum PaymentStatus {
+ PENDING
+ PAID
+ PARTIAL
+ REFUNDED
+ FAILED
+}
+enum StockMovementType {
+ OPENING
+ PURCHASE
+ SALE
+ SALE_RETURN
+ PURCHASE_RETURN
+ TRANSFER_IN
+ TRANSFER_OUT
+ ADJUSTMENT
+}
+enum SubscriptionStatus {
+ TRIALING
+ ACTIVE
+ PAST_DUE
+ CANCELLED
+}
+
+model User {
+id String @id @default(uuid()) @db.Uuid
+ email String @unique
+ passwordHash String
+ firstName String
+ lastName String
+ phone String?
+ status UserStatus @default(ACTIVE)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ memberships CompanyUser[]
+ ownedProjects Project[]
+ projectMemberships ProjectMember[]
+ refreshTokens RefreshToken[]
+ auditLogs AuditLog[]
+}
+model RefreshToken {
+id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ tokenHash String
+ expiresAt DateTime
+ revokedAt DateTime?
+ createdAt DateTime @default(now())
+ user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+ @@index([userId])
+}
+model Company {
+id String @id @default(uuid()) @db.Uuid
+ name String
+ legalName String?
+ slug String @unique
+ taxNumber String?
+ countryCode String @default("PK")
+ currencyCode String @default("PKR")
+ timezone String @default("Asia/Karachi")
+ isActive Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ memberships CompanyUser[]
+ projects Project[]
+ branches Branch[]
+ warehouses Warehouse[]
+ products Product[]
+ customers Customer[]
+ suppliers Supplier[]
+ sales Sale[]
+ purchases Purchase[]
+ stockMovements StockMovement[]
+ subscriptions Subscription[]
+ @@index([countryCode])
+}
+model CompanyUser {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ userId String @db.Uuid
+ roleId String? @db.Uuid
+ status MembershipStatus @default(ACTIVE)
+ isDefault Boolean @default(false)
+ createdAt DateTime @default(now())
+ company Company @relation(fields:[companyId], references:[id], onDelete:Cascade)
+ user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+ role Role? @relation(fields:[roleId], references:[id])
+ @@unique([companyId,userId])
+ @@index([userId,status])
+}
+model Branch {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ name String
+ code String
+ address String?
+ isDefault Boolean @default(false)
+ isActive Boolean @default(true)
+ company Company @relation(fields:[companyId], references:[id], onDelete:Cascade)
+ warehouses Warehouse[]
+ @@unique([companyId,code])
+}
+model Role {
+id String @id @default(uuid()) @db.Uuid
+ name String
+ key String @unique
+ description String?
+ memberships CompanyUser[]
+ permissions RolePermission[]
+}
+model Permission {
+id String @id @default(uuid()) @db.Uuid
+ key String @unique
+ description String?
+ roles RolePermission[]
+}
+model RolePermission {
+roleId String @db.Uuid
+ permissionId String @db.Uuid
+ role Role @relation(fields:[roleId],references:[id],onDelete:Cascade)
+ permission Permission @relation(fields:[permissionId],references:[id],onDelete:Cascade)
+ @@id([roleId,permissionId])
+}
+model Category {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ name String
+ parentId String? @db.Uuid
+ createdAt DateTime @default(now())
+ @@unique([companyId,name])
+ @@index([companyId])
+}
+model Product {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ categoryId String? @db.Uuid
+ sku String
+ barcode String?
+ name String
+ description String?
+ unit String @default("pcs")
+ costPrice Decimal @db.Decimal(18,4)
+ salePrice Decimal @db.Decimal(18,4)
+ taxRate Decimal @default(0) @db.Decimal(8,4)
+ trackInventory Boolean @default(true)
+ isActive Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ @@unique([companyId,sku])
+ @@unique([companyId,barcode])
+ @@index([companyId,name])
+}
+model Warehouse {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ branchId String? @db.Uuid
+ name String
+ code String
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ branch Branch? @relation(fields:[branchId],references:[id])
+ @@unique([companyId,code])
+}
+model StockMovement {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ productId String @db.Uuid
+ warehouseId String @db.Uuid
+ type StockMovementType
+ quantity Decimal @db.Decimal(18,4)
+ unitCost Decimal @db.Decimal(18,4)
+ referenceType String?
+ referenceId String? @db.Uuid
+ createdAt DateTime @default(now())
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ @@index([companyId,productId,warehouseId,createdAt])
+}
+model Customer {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ name String
+ email String?
+ phone String?
+ taxNumber String?
+ creditLimit Decimal @default(0) @db.Decimal(18,2)
+ createdAt DateTime @default(now())
+ @@index([companyId,name])
+}
+model Supplier {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ name String
+ email String?
+ phone String?
+ taxNumber String?
+ createdAt DateTime @default(now())
+ @@index([companyId,name])
+}
+model Sale {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ branchId String? @db.Uuid
+ customerId String? @db.Uuid
+ invoiceNumber String
+ status DocumentStatus @default(DRAFT)
+ paymentStatus PaymentStatus @default(PENDING)
+ subtotal Decimal @db.Decimal(18,2)
+ taxTotal Decimal @db.Decimal(18,2)
+ discountTotal Decimal @default(0) @db.Decimal(18,2)
+ grandTotal Decimal @db.Decimal(18,2)
+ currencyCode String
+ createdAt DateTime @default(now())
+ items SaleItem[]
+ @@unique([companyId,invoiceNumber])
+ @@index([companyId,createdAt])
+}
+model SaleItem {
+id String @id @default(uuid()) @db.Uuid
+ saleId String @db.Uuid
+ productId String @db.Uuid
+ description String
+ quantity Decimal @db.Decimal(18,4)
+ unitPrice Decimal @db.Decimal(18,4)
+ taxRate Decimal @db.Decimal(8,4)
+ lineTotal Decimal @db.Decimal(18,2)
+ sale Sale @relation(fields:[saleId],references:[id],onDelete:Cascade)
+}
+model Purchase {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ supplierId String? @db.Uuid
+ referenceNumber String
+ status DocumentStatus @default(DRAFT)
+ subtotal Decimal @db.Decimal(18,2)
+ taxTotal Decimal @db.Decimal(18,2)
+ grandTotal Decimal @db.Decimal(18,2)
+ createdAt DateTime @default(now())
+ items PurchaseItem[]
+ @@unique([companyId,referenceNumber])
+}
+model PurchaseItem {
+id String @id @default(uuid()) @db.Uuid
+ purchaseId String @db.Uuid
+ productId String @db.Uuid
+ quantity Decimal @db.Decimal(18,4)
+ unitCost Decimal @db.Decimal(18,4)
+ lineTotal Decimal @db.Decimal(18,2)
+ purchase Purchase @relation(fields:[purchaseId],references:[id],onDelete:Cascade)
+}
+model SubscriptionPlan {
+id String @id @default(uuid()) @db.Uuid
+ name String
+ code String @unique
+ price Decimal @db.Decimal(18,2)
+ interval String @default("month")
+ limits Json
+ isActive Boolean @default(true)
+ subscriptions Subscription[]
+}
+model Subscription {
+id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ planId String @db.Uuid
+ status SubscriptionStatus @default(TRIALING)
+ startsAt DateTime @default(now())
+ endsAt DateTime?
+ company Company @relation(fields:[companyId],references:[id])
+ plan SubscriptionPlan @relation(fields:[planId],references:[id])
+ @@index([companyId,status])
+}
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+model Project {
+ id String @id @default(uuid()) @db.Uuid
+ companyId String @db.Uuid
+ ownerId String? @db.Uuid
+ name String
+ code String
+ description String? @db.Text
+ status ProjectStatus @default(PLANNING)
+ priority ProjectPriority @default(MEDIUM)
+ startDate DateTime?
+ dueDate DateTime?
+ budget Decimal? @db.Decimal(18,2)
+ progress Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ company Company @relation(fields:[companyId],references:[id],onDelete:Cascade)
+ owner User? @relation(fields:[ownerId],references:[id],onDelete:SetNull)
+ members ProjectMember[]
+ tasks ProjectTask[]
+ milestones ProjectMilestone[]
+ activities ProjectActivity[]
+ @@unique([companyId,code])
+ @@index([companyId,status,dueDate])
+}
+model ProjectMember {
+ projectId String @db.Uuid
+ userId String @db.Uuid
+ projectRole String @default("member")
+ addedAt DateTime @default(now())
+ project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ @@id([projectId,userId])
+ @@index([userId])
+}
+model ProjectTask {
+ id String @id @default(uuid()) @db.Uuid
+ projectId String @db.Uuid
+ title String
+ description String? @db.Text
+ status String @default("todo")
+ priority ProjectPriority @default(MEDIUM)
+ assigneeId String? @db.Uuid
+ dueDate DateTime?
+ completedAt DateTime?
+ createdAt DateTime @default(now())
+ project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+ @@index([projectId,status])
+}
+model ProjectMilestone {
+ id String @id @default(uuid()) @db.Uuid
+ projectId String @db.Uuid
+ title String
+ description String? @db.Text
+ dueDate DateTime?
+ completedAt DateTime?
+ project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+}
+model ProjectActivity {
+ id String @id @default(uuid()) @db.Uuid
+ projectId String @db.Uuid
+ userId String? @db.Uuid
+ action String
+ details String? @db.Text
+ createdAt DateTime @default(now())
+ project Project @relation(fields:[projectId],references:[id],onDelete:Cascade)
+ @@index([projectId,createdAt])
+}
+
+
+
+model AuditLog {
+id String @id @default(uuid()) @db.Uuid
+ userId String? @db.Uuid
+ companyId String? @db.Uuid
+ action String
+ entity String
+ entityId String?
+ ipAddress String?
+ metadata Json?
+ createdAt DateTime @default(now())
+ user User? @relation(fields:[userId],references:[id])
+ @@index([companyId,createdAt])
+}
